@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JSON Quiz App — 20s/Question</title>
+  <style>
+    :root{
+      --bg:#5c6b8f;          /* slate-900 */
+      --panel:#111827;       /* gray-900 */
+      --muted:#94a3b8;       /* slate-400 */
+      --text:#e5e7eb;        /* gray-200 */
+      --accent:#22c55e;      /* green-500 */
+      --accent-2:#3b82f6;    /* blue-500 */
+      --warn:#ef4444;        /* red-500 */
+      --amber:#f59e0b;       /* amber-500 */
+      --card:#1d1e22;        /* dark card */
+      --border:#1f2937;      /* gray-800 */
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#0b1020,#0a0f1c);color:var(--text);font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;min-height:100dvh}
+    .wrap{max-width:900px;margin-inline:auto;padding:24px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
+    .title{font-size:clamp(18px,3vw,28px);font-weight:800;letter-spacing:.4px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .row{display:flex;flex-wrap:wrap;gap:12px}
+
+    /* Controls */
+    .btn{appearance:none;border:none;border-radius:12px;padding:12px 16px;background:var(--accent-2);color:white;font-weight:700;cursor:pointer;transition:.15s transform,.15s opacity,.15s box-shadow;box-shadow:0 6px 18px rgba(59,130,246,.35)}
+    .btn:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+    .btn.secondary{background:#334155;color:#e2e8f0;box-shadow:none}
+    .btn.ghost{background:transparent;border:1px solid var(--border);color:#e2e8f0}
+
+    input[type="file"]{padding:10px;border:1px dashed var(--border);border-radius:12px;background:#0b1220;width:100%;color:var(--muted)}
+    .hint{color:var(--muted);font-size:13px;margin-top:8px}
+
+    /* Quiz area */
+    #quizArea{display:none}
+    .meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 12px}
+    .pill{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--border);color:#cbd5e1}
+
+    .timer{height:12px;border-radius:999px;background:#0f172a;border:1px solid var(--border);overflow:hidden}
+    .timer > .bar{height:100%;width:100%;background:linear-gradient(90deg,var(--accent),#84cc16);transform-origin:left center;transition:width .2s linear}
+    .time-num{font-variant-numeric:tabular-nums}
+
+    .question{font-size:clamp(18px,2.4vw,24px);font-weight:700;margin:12px 0 8px}
+    .options{display:grid;gap:10px;margin-top:14px}
+    .opt{background:#828ca1;border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;text-align:left;transition:.12s transform,.12s border,.12s background}
+    .opt:hover{transform:translateY(-1px)}
+    .opt.disabled{pointer-events:none;opacity:.8}
+    .opt.correct{border-color:#14532d;background:linear-gradient(180deg,#0b1f14,#0b1324)}
+    .opt.wrong{border-color:#3f1d1d;background:linear-gradient(180deg,#1a0f12,#0b1324)}
+
+    /* Stats */
+    .stats{display:flex;gap:10px;flex-wrap:wrap}
+    .stat{flex:1;min-width:130px;background:#0b1220;border:1px solid var(--border);border-radius:14px;padding:10px}
+    .stat h4{margin:0;color:#cbd5e1;font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+    .stat .val{font-size:22px;font-weight:800;margin-top:6px}
+
+    /* Review */
+    #review{display:none}
+    table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px}
+    th,td{border-bottom:1px solid var(--border);padding:10px 8px;vertical-align:top}
+    th{color:#cbd5e1;text-align:left}
+    .ok{color:#22c55e}
+    .bad{color:#ef4444}
+    .skip{color:#f59e0b}
+    .qnum{opacity:.8}
+    .ans-pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid var(--border)}
+
+    .footer{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
+
+    /* Responsive */
+    @media (min-width:700px){
+      .options{grid-template-columns:1fr 1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title">📘 JSON Quiz App — 20 सेकंड प्रति प्रश्न</div>
+      <button class="btn ghost" id="resetBtn" style="display:none">Reset</button>
+    </header>
+
+    <!-- Loader / Uploader Card -->
+    <section id="loader" class="card">
+      <h3 style="margin:0 0 10px 0">अपना Quiz JSON अपलोड करें</h3>
+      <div class="row">
+        <input type="file" id="fileInput" accept="application/json" />
+        <button class="btn" id="startBtn" disabled>Start Quiz</button>
+        <button class="btn secondary" id="exampleBtn" title="Load sample">Use Sample</button>
+      </div>
+      <p class="hint">Schema (उदाहरण):
+        <code>{
+          "title":"My Quiz",
+          "questions":[{"q":"2+2?","options":["1","2","4","8"],"answer":2}]
+        }</code>
+      </p>
+      <p class="hint">• <strong>answer</strong> = सही option का <em>index</em> (0‑based).<br/>• हर प्रश्न अधिकतम 20 सेकंड दिखेगा। टाइम‑आउट पर वह <em>Not Attempted</em> माना जाएगा।</p>
+    </section>
+
+    <!-- Quiz Area -->
+    <section id="quizArea" class="card">
+      <div class="meta">
+        <div class="pill"><span id="qPos">Q 1/1</span></div>
+        <div class="pill time-num">⏳ <span id="timeLeft">20</span>s</div>
+      </div>
+      <div class="timer" aria-label="time remaining"><div class="bar" id="timeBar"></div></div>
+      <div class="question" id="qText">—</div>
+      <div class="options" id="options"></div>
+
+      <div class="row" style="margin-top:16px;align-items:center;justify-content:space-between">
+        <div class="stats">
+          <div class="stat"><h4>Correct</h4><div class="val" id="statOk">0</div></div>
+          <div class="stat"><h4>Wrong</h4><div class="val" id="statBad">0</div></div>
+          <div class="stat"><h4>Not Attempted</h4><div class="val" id="statSkip">0</div></div>
+        </div>
+        <button class="btn secondary" id="skipBtn" title="Mark as Not Attempted & Next">Skip</button>
+      </div>
+    </section>
+
+    <!-- Review / Result -->
+    <section id="review" class="card">
+      <h3 style="margin:0 0 6px 0">Result & Review</h3>
+      <p class="hint" id="scoreLine"></p>
+      <div style="overflow:auto">
+        <table id="reviewTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Question</th>
+              <th>Your Answer</th>
+              <th>Correct Answer</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="footer">
+        <button class="btn" id="replayBtn">Replay</button>
+        <button class="btn ghost" id="backBtn">Upload New JSON</button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // ----- State -----
+    let QUIZ = { title:"", questions:[] };
+    let idx = 0;
+    let timer = null;
+    let timeLeft = 20; // seconds
+    const MAX_TIME =20;
+
+    const results = []; // {q, options, correctIndex, chosenIndex|null, status:'ok'|'bad'|'skip'}
+    let statOk = 0, statBad = 0, statSkip = 0;
+
+    // ----- Elements -----
+    const el = (id)=>document.getElementById(id);
+    const fileInput = el('fileInput');
+    const startBtn = el('startBtn');
+    const exampleBtn = el('exampleBtn');
+    const resetBtn = el('resetBtn');
+
+    const loader = el('loader');
+    const quizArea = el('quizArea');
+    const review = el('review');
+
+    const qPos = el('qPos');
+    const timeLeftEl = el('timeLeft');
+    const timeBar = el('timeBar');
+    const qText = el('qText');
+    const optionsEl = el('options');
+
+    const statOkEl = el('statOk');
+    const statBadEl = el('statBad');
+    const statSkipEl = el('statSkip');
+
+    const skipBtn = el('skipBtn');
+    const scoreLine = el('scoreLine');
+    const reviewTable = el('reviewTable').querySelector('tbody');
+    const replayBtn = el('replayBtn');
+    const backBtn = el('backBtn');
+
+    // ----- Helpers -----
+    function sanitize(s){
+      return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
+    }
+
+    function validateQuiz(obj){
+      if(!obj || typeof obj !== 'object') throw new Error('Invalid JSON');
+      if(!Array.isArray(obj.questions) || obj.questions.length === 0) throw new Error('"questions" array missing/empty');
+      obj.questions.forEach((q,i)=>{
+        if(typeof q.q !== 'string' || !Array.isArray(q.options)) throw new Error(`Question ${i+1}: invalid shape`);
+        if(typeof q.answer !== 'number' || q.answer<0 || q.answer>=q.options.length) throw new Error(`Question ${i+1}: "answer" must be index (0-based)`);
+      });
+      return { title: obj.title || 'Quiz', questions: obj.questions };
+    }
+
+    function setView(which){
+      loader.style.display = (which==='loader')?'block':'none';
+      quizArea.style.display = (which==='quiz')?'block':'none';
+      review.style.display = (which==='review')?'block':'none';
+      resetBtn.style.display = (which==='quiz')?'inline-flex':'none';
+    }
+
+    function resetState(){
+      idx=0; timeLeft=MAX_TIME; statOk=statBad=statSkip=0; results.length=0;
+      updateStats();
+      clearInterval(timer); timer=null;
+      timeLeftEl.textContent = MAX_TIME;
+      timeBar.style.width = '100%';
+    }
+
+    function updateStats(){
+      statOkEl.textContent = statOk;
+      statBadEl.textContent = statBad;
+      statSkipEl.textContent = statSkip;
+    }
+
+    function startTimer(){
+      clearInterval(timer);
+      const start = Date.now();
+      timeLeft = MAX_TIME;
+      timeLeftEl.textContent = timeLeft;
+      timeBar.style.width = '100%';
+      timer = setInterval(()=>{
+        const elapsed = Math.floor((Date.now()-start)/1000);
+        const remain = Math.max(0, MAX_TIME - elapsed);
+        timeLeft = remain;
+        timeLeftEl.textContent = remain;
+        timeBar.style.width = (remain/MAX_TIME*100) + '%';
+        if(remain<=0){
+          clearInterval(timer);
+          // mark as skip if not answered
+          finalizeQuestion(null, true);
+        }
+      }, 200);
+    }
+
+    function renderQuestion(){
+      const q = QUIZ.questions[idx];
+      qPos.textContent = `Q ${idx+1}/${QUIZ.questions.length}`;
+      qText.innerHTML = sanitize(q.q);
+      optionsEl.innerHTML = '';
+      q.options.forEach((opt, i)=>{
+        const btn = document.createElement('button');
+        btn.className = 'opt';
+        btn.innerHTML = `<span class="ans-pill">${String.fromCharCode(65+i)}</span> &nbsp;${sanitize(opt)}`;
+        btn.addEventListener('click', ()=> handleSelect(i));
+        optionsEl.appendChild(btn);
+      });
+      startTimer();
+    }
+
+    function disableOptions(){
+      Array.from(optionsEl.children).forEach(ch=>ch.classList.add('disabled'));
+    }
+
+    function handleSelect(choiceIdx){
+      if(timeLeft<=0) return; // already timed out
+      clearInterval(timer);
+      finalizeQuestion(choiceIdx, false);
+    }
+
+    function finalizeQuestion(choiceIdx, timedOut){
+      disableOptions();
+      const q = QUIZ.questions[idx];
+      const correct = q.answer;
+      const children = Array.from(optionsEl.children);
+      // paint
+      children.forEach((btn,i)=>{
+        if(i===correct) btn.classList.add('correct');
+        if(choiceIdx!==null && i===choiceIdx && i!==correct) btn.classList.add('wrong');
+      });
+
+      let status;
+      if(timedOut || choiceIdx===null){
+        statSkip++; status='skip';
+      } else if(choiceIdx===correct){
+        statOk++; status='ok';
+      } else { statBad++; status='bad'; }
+      updateStats();
+
+      results.push({
+        q: q.q, options: q.options.slice(), correctIndex: correct,
+        chosenIndex: (choiceIdx===null? null: choiceIdx), status
+      });
+
+      // go next after short pause
+      setTimeout(nextQuestion, 700);
+    }
+
+    function nextQuestion(){
+      idx++;
+      if(idx < QUIZ.questions.length){
+        timeLeft = MAX_TIME;
+        renderQuestion();
+      } else {
+        finishQuiz();
+      }
+    }
+
+    function finishQuiz(){
+      clearInterval(timer); // Ensure timer is cleared when quiz finishes
+      setView('review');
+      const total = QUIZ.questions.length;
+      scoreLine.innerHTML = `Score: <b>${statOk}</b> / ${total} &nbsp;·&nbsp; Wrong: <b>${statBad}</b> &nbsp;·&nbsp; Not Attempted: <b>${statSkip}</b>`;
+      // build table
+      reviewTable.innerHTML = '';
+      results.forEach((r,i)=>{
+        const tr = document.createElement('tr');
+        const your = r.chosenIndex==null? '—' : sanitize(r.options[r.chosenIndex]);
+        const corr = sanitize(r.options[r.correctIndex]);
+        tr.innerHTML = `
+          <td class="qnum">${i+1}</td>
+          <td>${sanitize(r.q)}</td>
+          <td>${your}</td>
+          <td>${corr}</td>
+          <td>${ r.status==='ok' ? '<span class="ok">✓ Correct</span>' : r.status==='bad' ? '<span class="bad">✗ Wrong</span>' : '<span class="skip">— Skipped</span>'}</td>
+        `;
+        reviewTable.appendChild(tr);
+      });
+    }
+
+    // ----- Events -----
+    exampleBtn.addEventListener('click', ()=>{
+      const sample = {
+        title: 'Sample Math & GK',
+        questions: [
+          { q: '2 + 2 = ?', options: ['1','2','4','8'], answer: 2 },
+          { q: 'Capital of India?', options:['Mumbai','New Delhi','Kolkata','Chennai'], answer: 1 },
+          { q: 'HTML stands for?', options:['Hyperlinks and Text Markup Language','Home Tool Markup Language','HyperText Markup Language','Hyperlinking Text Management Language'], answer: 2 },
+          { q: '5 * 6 = ?', options:['11','30','56','26'], answer: 1 },
+        ]
+      };
+      QUIZ = validateQuiz(sample);
+      startBtn.disabled = false;
+    });
+
+    fileInput.addEventListener('change', async (e)=>{
+      startBtn.disabled = true;
+      const f = e.target.files && e.target.files[0];
+      if(!f) return;
+      try{
+        const text = await f.text();
+        const obj = JSON.parse(text);
+        QUIZ = validateQuiz(obj);
+        startBtn.disabled = false;
+      }catch(err){
+        alert('Invalid Quiz JSON: '+ err.message);
+        QUIZ = {title:'',questions:[]};
+      }
+    });
+
+    startBtn.addEventListener('click', ()=>{
+      if(!QUIZ.questions.length) return;
+      setView('quiz');
+      resetState();
+      renderQuestion();
+    });
+
+    skipBtn.addEventListener('click', ()=>{
+      if(Array.from(optionsEl.children).some(b=>b.classList.contains('disabled'))){
+        return; // already answered
+      }
+      clearInterval(timer);
+      finalizeQuestion(null, true);
+    });
+
+    replayBtn.addEventListener('click', ()=>{
+      // Play same quiz again
+      setView('quiz');
+      resetState();
+      renderQuestion();
+    });
+
+    backBtn.addEventListener('click', ()=>{
+      setView('loader');
+      resetState();
+      fileInput.value = '';
+      startBtn.disabled = true;
+    });
+
+    resetBtn.addEventListener('click', ()=>{
+      if(confirm('Reset current quiz?')){
+        setView('loader');
+        resetState();
+      }
+    });
+  </script>
+</body>
+</html>
